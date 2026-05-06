@@ -1,1 +1,506 @@
-tt7ututyutugguguguyggugul
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>綠意收藏家 Pro - 雲端版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --emerald-dark: #064e3b;
+            --emerald-mid: #065f46;
+            --emerald-light: #10b981;
+        }
+        body {
+            background-color: var(--emerald-dark);
+            color: #f3f4f6;
+            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+        }
+        .emerald-gradient {
+            background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+        }
+        .btn-primary {
+            background-color: var(--emerald-light);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background-color: #34d399;
+            transform: translateY(-2px);
+        }
+        .loader {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-radius: 50%;
+            border-top: 3px solid var(--emerald-light);
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+
+    <!-- 登入遮罩 -->
+    <div id="auth-overlay" class="fixed inset-0 bg-emerald-950 z-[200] flex flex-col items-center justify-center p-4">
+        <div class="text-center space-y-6">
+            <h1 class="text-4xl font-bold">🌿 綠意收藏家</h1>
+            <p class="text-emerald-300">雲端同步版：請先登入以開始管理您的私藏</p>
+            <button id="login-btn" class="bg-white text-gray-900 flex items-center gap-3 px-6 py-3 rounded-full font-bold text-lg shadow-lg hover:bg-gray-100 transition-all">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
+                使用 Google 帳號登入
+            </button>
+            <div id="login-loading" class="hidden flex justify-center"><div class="loader"></div></div>
+        </div>
+    </div>
+
+    <!-- 導覽列 -->
+    <nav class="sticky top-0 z-50 emerald-gradient shadow-xl p-4">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <span class="text-3xl">🌿</span> <span class="hidden sm:inline">綠意收藏家</span>
+            </h1>
+            <div class="flex gap-4 items-center">
+                <button onclick="switchTab('dashboard')" class="hover:text-emerald-300 text-sm">儀表板</button>
+                <button onclick="switchTab('collection')" class="hover:text-emerald-300 text-sm">收藏</button>
+                <button onclick="switchTab('wishlist')" class="hover:text-emerald-300 text-sm">願望</button>
+                <div id="user-profile" class="flex items-center gap-2 border-l border-white/20 pl-4">
+                    <img id="user-avatar" src="" class="w-8 h-8 rounded-full border border-emerald-400">
+                    <button onclick="handleLogout()" class="text-xs opacity-70 hover:opacity-100">登出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto mt-8 px-4">
+        <!-- 權限診斷區塊 -->
+        <div id="permission-error-box" class="hidden mb-6 p-6 bg-red-900/30 border-2 border-red-500 rounded-2xl text-red-100">
+            <div class="flex items-center gap-4 mb-4">
+                <span class="text-3xl">⚠️</span>
+                <h3 class="text-xl font-bold">權限不足 (Permission Denied)</h3>
+            </div>
+            <p class="mb-4 text-sm opacity-90">您的 Firestore 安全規則拒絕了讀取請求。請確保您的 Firebase Console 設定如下：</p>
+            <div class="bg-black/40 p-4 rounded-lg font-mono text-xs mb-4 overflow-x-auto">
+                <p class="text-emerald-400">// 請在 Firebase Console > Firestore > Rules 貼上此段：</p>
+                <pre class="mt-2" id="rules-hint"></pre>
+            </div>
+            <button onclick="location.reload()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold">修改後點此重新整理</button>
+        </div>
+
+        <!-- 儀表板區域 -->
+        <section id="tab-dashboard" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-card p-6 flex flex-col items-center justify-center text-center">
+                    <h3 class="text-emerald-300 mb-2">平均收藏評分</h3>
+                    <div id="avg-rating" class="text-5xl font-bold text-white">0.0</div>
+                    <div class="text-yellow-400 mt-2 text-xl" id="avg-stars">☆☆☆☆☆</div>
+                </div>
+                <div class="glass-card p-6 flex flex-col items-center justify-center text-center">
+                    <h3 class="text-emerald-300 mb-2">總收藏價值</h3>
+                    <div id="total-value" class="text-4xl font-bold text-white">$0</div>
+                </div>
+                <div class="glass-card p-6">
+                    <h3 class="text-emerald-300 mb-4 text-center">近期願望目標</h3>
+                    <div class="relative pt-1">
+                        <div id="savings-item-name" class="text-center font-bold mb-2">無</div>
+                        <div class="overflow-hidden h-4 mb-4 text-xs flex rounded bg-emerald-900 border border-white/10">
+                            <div id="savings-bar" style="width:0%" class="bg-emerald-500 transition-all duration-700"></div>
+                        </div>
+                        <p id="savings-status" class="text-xs text-center opacity-80">尚無進行中的願望</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div class="glass-card p-6 h-[400px]">
+                    <h3 class="text-xl font-semibold mb-4">收藏類別分析</h3>
+                    <div class="h-72"><canvas id="categoryChart"></canvas></div>
+                </div>
+                <div class="glass-card p-6 overflow-y-auto max-h-[400px]">
+                    <h3 class="text-xl font-semibold mb-4">最新入庫項目</h3>
+                    <div id="recent-list" class="space-y-3"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 我的收藏 -->
+        <section id="tab-collection" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">📦 我的收藏庫</h2>
+                <button onclick="toggleModal('modal-add-item')" class="btn-primary px-4 py-2 rounded-lg font-bold shadow-lg">+ 新增收藏</button>
+            </div>
+            <div id="collection-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- 願望清單 -->
+        <section id="tab-wishlist" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">✨ 願望清單</h2>
+                <button onclick="toggleModal('modal-add-wish')" class="btn-primary px-4 py-2 rounded-lg font-bold shadow-lg">+ 新增願望</button>
+            </div>
+            <div id="wishlist-container" class="space-y-4"></div>
+        </section>
+    </main>
+
+    <!-- Modal: 新增收藏 -->
+    <div id="modal-add-item" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[100] p-4">
+        <div class="glass-card bg-emerald-900 w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4">加入新收藏</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-emerald-300">物品照片</label>
+                    <input type="file" id="item-image" accept="image/*" class="mt-1 text-sm file:bg-emerald-700 file:text-white file:border-none file:rounded file:px-2 file:mr-4">
+                    <div id="image-preview" class="mt-2 hidden"><img class="w-full h-32 object-cover rounded border border-white/20"></div>
+                </div>
+                <input type="text" id="item-name" placeholder="物品名稱">
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="item-category">
+                        <option value="公仔模型">公仔模型</option>
+                        <option value="電子產品">電子產品</option>
+                        <option value="書籍/漫畫">書籍/漫畫</option>
+                        <option value="其他">其他</option>
+                    </select>
+                    <input type="number" id="item-price" placeholder="購入價值 ($)">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1 text-emerald-300 text-center">評分：<span id="rating-val">3.0</span></label>
+                    <input type="range" id="item-rating" min="1" max="5" step="0.5" value="3.0">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button onclick="saveItemToFirestore()" id="save-item-btn" class="btn-primary flex-1 py-2 rounded font-bold">確認儲存</button>
+                    <button onclick="toggleModal('modal-add-item')" class="bg-gray-600 flex-1 py-2 rounded">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 新增願望 -->
+    <div id="modal-add-wish" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-[100] p-4">
+        <div class="glass-card bg-emerald-900 w-full max-w-md p-6">
+            <h3 class="text-xl font-bold mb-4">許下新願望</h3>
+            <div class="space-y-4">
+                <input type="text" id="wish-name" placeholder="想要什麼？">
+                <input type="number" id="wish-target" placeholder="目標價格 ($)">
+                <div class="flex gap-2">
+                    <button onclick="saveWishToFirestore()" class="btn-primary flex-1 py-2 rounded font-bold">加入清單</button>
+                    <button onclick="toggleModal('modal-add-wish')" class="bg-gray-600 flex-1 py-2 rounded">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCpritUCSkGEyjJg9gYterRnPz4rIeazuQ",
+            authDomain: "collect-2aec0.firebaseapp.com",
+            projectId: "collect-2aec0",
+            storageBucket: "collect-2aec0.firebasestorage.app",
+            messagingSenderId: "241828603619",
+            appId: "1:241828603619:web:b6a1c115a3d899e00007d6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'emerald-collector-pro';
+
+        let currentUser = null;
+        let collectionData = [];
+        let wishlistData = [];
+        let chartInstance = null;
+        let base64Image = "";
+        let unsubItems = null;
+        let unsubWishes = null;
+
+        const initAuth = async () => {
+            const loginBtn = document.getElementById('login-btn');
+            const loading = document.getElementById('login-loading');
+
+            loginBtn.addEventListener('click', async () => {
+                loginBtn.classList.add('hidden');
+                loading.classList.remove('hidden');
+                try {
+                    await signInWithPopup(auth, new GoogleAuthProvider());
+                } catch (e) {
+                    console.error("Login Error", e);
+                    loginBtn.classList.remove('hidden');
+                    loading.classList.add('hidden');
+                }
+            });
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUser = user;
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    document.getElementById('user-avatar').src = user.photoURL || 'https://via.placeholder.com/150';
+                    setupListeners();
+                } else {
+                    currentUser = null;
+                    if (unsubItems) unsubItems();
+                    if (unsubWishes) unsubWishes();
+                    document.getElementById('auth-overlay').classList.remove('hidden');
+                    loginBtn.classList.remove('hidden');
+                    loading.classList.add('hidden');
+                }
+            });
+
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try { await signInWithCustomToken(auth, __initial_auth_token); } 
+                catch (e) { await signInAnonymously(auth); }
+            }
+        };
+
+        const setupListeners = () => {
+            if (!currentUser) return;
+            
+            // 重要：依照規定路徑建構
+            const collRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items');
+            const wishRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes');
+
+            const handleError = (err) => {
+                console.error("Firestore Permission Error:", err);
+                if (err.code === 'permission-denied') {
+                    const box = document.getElementById('permission-error-box');
+                    const hint = document.getElementById('rules-hint');
+                    box.classList.remove('hidden');
+                    hint.textContent = `service cloud.firestore {
+  match /databases/{database}/documents {
+    match /artifacts/${APP_ID}/users/${currentUser.uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == "${currentUser.uid}";
+    }
+  }
+}`;
+                }
+            };
+
+            unsubItems = onSnapshot(collRef, (snap) => {
+                collectionData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderAll();
+            }, handleError);
+
+            unsubWishes = onSnapshot(wishRef, (snap) => {
+                wishlistData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderAll();
+            }, handleError);
+        };
+
+        // --- Data Actions ---
+        window.saveItemToFirestore = async () => {
+            if (!currentUser) return;
+            const btn = document.getElementById('save-item-btn');
+            const name = document.getElementById('item-name').value;
+            const category = document.getElementById('item-category').value;
+            const price = parseFloat(document.getElementById('item-price').value) || 0;
+            const rating = parseFloat(document.getElementById('item-rating').value);
+            if (!name) return;
+
+            btn.disabled = true;
+            btn.textContent = "儲存中...";
+            try {
+                await addDoc(collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items'), {
+                    name, category, price, rating, image: base64Image, createdAt: new Date().toISOString()
+                });
+                toggleModal('modal-add-item');
+                resetItemForm();
+            } catch (e) { alert("儲存失敗：請檢查規則設定。"); }
+            finally { btn.disabled = false; btn.textContent = "確認儲存"; }
+        };
+
+        window.saveWishToFirestore = async () => {
+            if (!currentUser) return;
+            const name = document.getElementById('wish-name').value;
+            const target = parseFloat(document.getElementById('wish-target').value) || 0;
+            if (!name || !target) return;
+            try {
+                await addDoc(collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes'), {
+                    name, target, saved: 0, createdAt: new Date().toISOString()
+                });
+                toggleModal('modal-add-wish');
+                document.getElementById('wish-name').value = '';
+                document.getElementById('wish-target').value = '';
+            } catch (e) { console.error(e); }
+        };
+
+        window.updateWishSaved = async (id, amount) => {
+            if (!currentUser) return;
+            const wish = wishlistData.find(w => w.id === id);
+            if (wish) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes', id), {
+                    saved: Math.max(0, wish.saved + amount)
+                });
+            }
+        };
+
+        window.deleteFirestoreDoc = async (id, type) => {
+            if (!currentUser || !confirm("確定要刪除嗎？")) return;
+            const coll = type === 'coll' ? 'items' : 'wishes';
+            await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, coll, id));
+        };
+
+        window.handleLogout = () => signOut(auth);
+
+        // --- Render UI ---
+        function renderAll() {
+            renderDashboard();
+            renderCollectionGrid();
+            renderWishlistItems();
+        }
+
+        function renderDashboard() {
+            const total = collectionData.reduce((s, i) => s + (i.price || 0), 0);
+            const avg = collectionData.length ? (collectionData.reduce((s, i) => s + (i.rating || 0), 0) / collectionData.length).toFixed(1) : "0.0";
+            
+            document.getElementById('total-value').textContent = `$${total.toLocaleString()}`;
+            document.getElementById('avg-rating').textContent = avg;
+
+            let stars = "";
+            for(let i=0; i<5; i++) stars += i < Math.floor(avg) ? "★" : "☆";
+            document.getElementById('avg-stars').textContent = stars;
+
+            const cats = {};
+            collectionData.forEach(i => cats[i.category] = (cats[i.category] || 0) + 1);
+            updateChart(Object.keys(cats), Object.values(cats));
+
+            const recent = [...collectionData].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
+            document.getElementById('recent-list').innerHTML = recent.map(r => `
+                <div class="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
+                    <div class="w-12 h-12 rounded-lg bg-emerald-800 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        ${r.image ? `<img src="${r.image}" class="w-full h-full object-cover">` : '📦'}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="truncate font-bold text-white">${r.name}</p>
+                        <p class="text-[10px] text-emerald-400 uppercase tracking-tighter">${r.category}</p>
+                    </div>
+                    <span class="text-emerald-400 font-mono font-bold">$${(r.price || 0).toLocaleString()}</span>
+                </div>
+            `).join('') || '<p class="text-center opacity-30 py-10">尚無收藏</p>';
+
+            const topWish = [...wishlistData].sort((a,b) => b.createdAt.localeCompare(a.createdAt))[0];
+            const nameEl = document.getElementById('savings-item-name');
+            const barEl = document.getElementById('savings-bar');
+            const statusEl = document.getElementById('savings-status');
+            if(topWish) {
+                const p = Math.min(100, Math.round((topWish.saved / topWish.target) * 100));
+                nameEl.textContent = topWish.name;
+                barEl.style.width = `${p}%`;
+                statusEl.textContent = `${p}% - 已存 $${topWish.saved.toLocaleString()} / 目標 $${topWish.target.toLocaleString()}`;
+            } else {
+                nameEl.textContent = "無進行中項目";
+                barEl.style.width = "0%";
+                statusEl.textContent = "許個願望來追蹤存錢進度吧";
+            }
+        }
+
+        function renderCollectionGrid() {
+            const grid = document.getElementById('collection-grid');
+            grid.innerHTML = collectionData.map(item => `
+                <div class="glass-card overflow-hidden flex flex-col h-full group hover:border-emerald-400 transition-all">
+                    <div class="h-48 bg-emerald-950/50 relative">
+                        ${item.image ? `<img src="${item.image}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center text-5xl opacity-10">📦</div>'}
+                        <div class="absolute top-3 right-3 bg-black/60 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold text-yellow-400">★ ${item.rating}</div>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-[10px] text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded-full uppercase">${item.category}</span>
+                            <button onclick="deleteFirestoreDoc('${item.id}', 'coll')" class="text-white/20 hover:text-red-400 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118z"/></svg>
+                            </button>
+                        </div>
+                        <h4 class="font-bold text-lg leading-tight flex-1 text-white">${item.name}</h4>
+                        <div class="mt-4 pt-3 border-t border-white/10 flex justify-between items-center">
+                            <span class="text-xl font-mono text-emerald-400 font-bold">$${(item.price || 0).toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderWishlistItems() {
+            const cont = document.getElementById('wishlist-container');
+            cont.innerHTML = wishlistData.map(w => {
+                const progress = Math.min(100, (w.saved / w.target) * 100);
+                return `
+                <div class="glass-card p-5 relative overflow-hidden group">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex-1">
+                            <h4 class="text-xl font-bold text-white">${w.name} ${progress >= 100 ? '✨' : ''}</h4>
+                            <div class="text-sm text-emerald-300 mt-1 font-mono">$${w.saved.toLocaleString()} / $${w.target.toLocaleString()}</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="updateWishSaved('${w.id}', 100)" class="bg-emerald-700/50 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">+100</button>
+                            <button onclick="updateWishSaved('${w.id}', 1000)" class="bg-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">+1000</button>
+                            <button onclick="deleteFirestoreDoc('${w.id}', 'wish')" class="ml-4 p-2 text-white/20 hover:text-red-400 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118z"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="w-full bg-black/40 h-2.5 mt-4 rounded-full overflow-hidden">
+                        <div class="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full transition-all duration-1000" style="width:${progress}%"></div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function updateChart(labels, values) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{ data: values, backgroundColor: ['#10b981', '#34d399', '#059669', '#047857', '#065f46'], borderWidth: 0 }]
+                },
+                options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', boxWidth: 12, font: { size: 10 } } } } }
+            });
+        }
+
+        document.getElementById('item-image').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 500000) { alert("圖片需小於 500KB"); this.value = ""; return; }
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    base64Image = ev.target.result;
+                    const pre = document.getElementById('image-preview');
+                    pre.classList.remove('hidden');
+                    pre.querySelector('img').src = base64Image;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function resetItemForm() {
+            document.getElementById('item-name').value = '';
+            document.getElementById('item-price').value = '';
+            base64Image = "";
+            document.getElementById('image-preview').classList.add('hidden');
+            document.getElementById('item-image').value = "";
+        }
+
+        initAuth();
+    </script>
+
+    <script>
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`tab-${id}`).classList.remove('hidden');
+        }
+        function toggleModal(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+        document.getElementById('item-rating').addEventListener('input', (e) => {
+            document.getElementById('rating-val').textContent = parseFloat(e.target.value).toFixed(1);
+        });
+    </script>
+</body>
+</html>
