@@ -192,7 +192,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs & 全域控制邏輯 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -219,14 +219,27 @@
         let base64Image = "";
         let unsubItems = null;
         let unsubWishes = null;
-        let isLocalStorageMode = false; // 是否因規則拒絕等原因自動切換為本地儲存
+        let isLocalStorageMode = false; 
+
+        // --- 全域導覽與彈窗操控 ---
+        window.switchTab = (id) => {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`tab-${id}`).classList.remove('hidden');
+        };
+
+        window.toggleModal = (id) => {
+            document.getElementById(id).classList.toggle('hidden');
+        };
+
+        document.getElementById('item-rating').addEventListener('input', (e) => {
+            document.getElementById('rating-val').textContent = parseFloat(e.target.value).toFixed(1);
+        });
 
         const initAuth = async () => {
             const loginBtn = document.getElementById('login-btn');
             const guestBtn = document.getElementById('guest-btn');
             const loading = document.getElementById('login-loading');
 
-            // 1. 註冊登入狀態變化監聽器
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     currentUser = user;
@@ -239,6 +252,9 @@
                         updateStorageModeBadge("雲端同步中", "bg-emerald-500/20", "text-emerald-300");
                     }
                     
+                    // 確保每一次登入後，重置並重啟安全監聽器
+                    if (unsubItems) unsubItems();
+                    if (unsubWishes) unsubWishes();
                     setupListeners();
                 } else {
                     currentUser = null;
@@ -251,7 +267,6 @@
                 }
             });
 
-            // 2. Google 登入事件
             loginBtn.addEventListener('click', async () => {
                 loginBtn.classList.add('hidden');
                 guestBtn.classList.add('hidden');
@@ -267,7 +282,6 @@
                 }
             });
 
-            // 3. 訪客登入事件
             guestBtn.addEventListener('click', async () => {
                 loginBtn.classList.add('hidden');
                 guestBtn.classList.add('hidden');
@@ -276,12 +290,10 @@
                     await signInAnonymously(auth);
                 } catch (e) {
                     console.error("Anonymous Sign-In Error", e);
-                    // 萬一連匿名登入都連不上（例如完全沒網路），直接切換至本機模式
                     activateLocalStorageMode();
                 }
             });
 
-            // 4. 自定義 Token 初始化
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                 try { 
                     await signInWithCustomToken(auth, __initial_auth_token); 
@@ -293,18 +305,19 @@
 
         const updateStorageModeBadge = (text, bgColor, textColor) => {
             const badge = document.getElementById('storage-mode-badge');
-            badge.textContent = text;
-            badge.className = `text-[10px] ${bgColor} ${textColor} px-2 py-0.5 rounded-full`;
+            if (badge) {
+                badge.textContent = text;
+                badge.className = `text-[10px] ${bgColor} ${textColor} px-2 py-0.5 rounded-full`;
+            }
         };
 
-        // --- 啟用完全本地儲存模式（當 Firebase Rules 報錯時自動啟用） ---
         const activateLocalStorageMode = () => {
+            if (isLocalStorageMode) return;
             isLocalStorageMode = true;
-            console.warn("⚠️ 已安全切換至本地快取儲存模式（LocalStorage）");
+            console.warn("⚠️ 權限不足或連線受阻：已自動降級至本地快取儲存模式（LocalStorage）");
             updateStorageModeBadge("本地儲存模式", "bg-orange-500/20", "text-orange-300");
             document.getElementById('auth-overlay').classList.add('hidden');
             
-            // 載入本地儲存資料
             collectionData = JSON.parse(localStorage.getItem('emerald_local_items')) || [];
             wishlistData = JSON.parse(localStorage.getItem('emerald_local_wishes')) || [];
             renderAll();
@@ -316,23 +329,43 @@
             const collRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items');
             const wishRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes');
 
+            let retryCount = 0;
+            const maxRetries = 1;
+
             const handlePermissionDenied = (err) => {
-                console.error("Firestore Permission Error, fallback to LocalStorage:", err);
+                console.warn(`Firestore 監聽暫時受阻 (${err.code}):`, err.message);
                 if (err.code === 'permission-denied') {
-                    // 自動無縫切換，提升使用者體驗，不彈出崩潰錯誤
-                    activateLocalStorageMode();
+                    // 自動進行 1 次短延遲重試，以應對權限剛更新時的安全策略滯後
+                    if (retryCount < maxRetries) {
+                        retryCount++;
+                        console.log(`正在重試雲端連線... (${retryCount}/${maxRetries})`);
+                        setTimeout(() => {
+                            if (currentUser && !isLocalStorageMode) {
+                                setupListeners();
+                            }
+                        }, 2000);
+                    } else {
+                        // 重試失敗，流暢降級至本地，防崩潰
+                        activateLocalStorageMode();
+                    }
                 }
             };
 
-            unsubItems = onSnapshot(collRef, (snap) => {
-                collectionData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderAll();
-            }, handlePermissionDenied);
+            // 綁定雲端實時監聽
+            try {
+                unsubItems = onSnapshot(collRef, (snap) => {
+                    collectionData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    renderAll();
+                }, handlePermissionDenied);
 
-            unsubWishes = onSnapshot(wishRef, (snap) => {
-                wishlistData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                renderAll();
-            }, handlePermissionDenied);
+                unsubWishes = onSnapshot(wishRef, (snap) => {
+                    wishlistData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    renderAll();
+                }, handlePermissionDenied);
+            } catch (e) {
+                console.error("啟動雲端監聽時發生非預期錯誤:", e);
+                activateLocalStorageMode();
+            }
         };
 
         // --- 資料儲存/更新與刪除操作 ---
@@ -352,7 +385,6 @@
             };
 
             if (isLocalStorageMode || !currentUser) {
-                // 本地儲存模式
                 payload.id = Date.now().toString();
                 collectionData.push(payload);
                 localStorage.setItem('emerald_local_items', JSON.stringify(collectionData));
@@ -362,14 +394,21 @@
                 btn.disabled = false;
                 btn.textContent = "確認儲存";
             } else {
-                // 雲端同步模式
                 try {
                     await addDoc(collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items'), payload);
                     toggleModal('modal-add-item');
                     resetItemForm();
                 } catch (e) { 
-                    console.error("Save Error", e);
-                    alert("儲存失敗，請檢查網路連線或稍後再試。"); 
+                    console.error("Cloud Save Error, switching to local store fallback:", e);
+                    alert("雲端儲存失敗（可能因資料庫權限未設定），已自動為您切換並儲存至本機！");
+                    activateLocalStorageMode();
+                    
+                    payload.id = Date.now().toString();
+                    collectionData.push(payload);
+                    localStorage.setItem('emerald_local_items', JSON.stringify(collectionData));
+                    toggleModal('modal-add-item');
+                    resetItemForm();
+                    renderAll();
                 } finally { 
                     btn.disabled = false; 
                     btn.textContent = "確認儲存"; 
@@ -400,7 +439,19 @@
                     toggleModal('modal-add-wish');
                     document.getElementById('wish-name').value = '';
                     document.getElementById('wish-target').value = '';
-                } catch (e) { console.error(e); }
+                } catch (e) { 
+                    console.error("Cloud Save Wish Error, switching to local store fallback:", e);
+                    alert("雲端儲存失敗（可能因資料庫權限未設定），已自動為您切換並儲存至本機！");
+                    activateLocalStorageMode();
+
+                    payload.id = Date.now().toString();
+                    wishlistData.push(payload);
+                    localStorage.setItem('emerald_local_wishes', JSON.stringify(wishlistData));
+                    toggleModal('modal-add-wish');
+                    document.getElementById('wish-name').value = '';
+                    document.getElementById('wish-target').value = '';
+                    renderAll();
+                }
             }
         };
 
@@ -556,7 +607,6 @@
         function updateChart(labels, values) {
             const ctx = document.getElementById('categoryChart').getContext('2d');
             
-            // 防呆處理：若完全無資料，渲染預設灰色圓餅圖，避免 Chart.js 報錯或出現空白
             let chartLabels = labels;
             let chartValues = values;
             let bgColors = ['#10b981', '#34d399', '#059669', '#047857', '#065f46'];
@@ -610,19 +660,6 @@
         }
 
         initAuth();
-    </script>
-
-    <script>
-        function switchTab(id) {
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-            document.getElementById(`tab-${id}`).classList.remove('hidden');
-        }
-        function toggleModal(id) {
-            document.getElementById(id).classList.toggle('hidden');
-        }
-        document.getElementById('item-rating').addEventListener('input', (e) => {
-            document.getElementById('rating-val').textContent = parseFloat(e.target.value).toFixed(1);
-        });
     </script>
 </body>
 </html>
