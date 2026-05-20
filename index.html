@@ -79,20 +79,6 @@
     </nav>
 
     <main class="max-w-6xl mx-auto mt-8 px-4">
-        <!-- 權限診斷區塊 -->
-        <div id="permission-error-box" class="hidden mb-6 p-6 bg-red-900/30 border-2 border-red-500 rounded-2xl text-red-100">
-            <div class="flex items-center gap-4 mb-4">
-                <span class="text-3xl">⚠️</span>
-                <h3 class="text-xl font-bold">權限不足 (Permission Denied)</h3>
-            </div>
-            <p class="mb-4 text-sm opacity-90">您的 Firestore 安全規則拒絕了讀取請求。請確保您的 Firebase Console 設定如下：</p>
-            <div class="bg-black/40 p-4 rounded-lg font-mono text-xs mb-4 overflow-x-auto">
-                <p class="text-emerald-400">// 請在 Firebase Console > Firestore > Rules 貼上此段：</p>
-                <pre class="mt-2" id="rules-hint"></pre>
-            </div>
-            <button onclick="location.reload()" class="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold">修改後點此重新整理</button>
-        </div>
-
         <!-- 儀表板區域 -->
         <section id="tab-dashboard" class="tab-content">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -264,24 +250,11 @@
         const setupListeners = () => {
             if (!currentUser) return;
             
-            // 重要：依照規定路徑建構
             const collRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items');
             const wishRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes');
 
             const handleError = (err) => {
                 console.error("Firestore Permission Error:", err);
-                if (err.code === 'permission-denied') {
-                    const box = document.getElementById('permission-error-box');
-                    const hint = document.getElementById('rules-hint');
-                    box.classList.remove('hidden');
-                    hint.textContent = `service cloud.firestore {
-  match /databases/{database}/documents {
-    match /artifacts/${APP_ID}/users/${currentUser.uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == "${currentUser.uid}";
-    }
-  }
-}`;
-                }
             };
 
             unsubItems = onSnapshot(collRef, (snap) => {
