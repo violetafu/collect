@@ -49,13 +49,21 @@
 
     <!-- 登入遮罩 -->
     <div id="auth-overlay" class="fixed inset-0 bg-emerald-950 z-[200] flex flex-col items-center justify-center p-4">
-        <div class="text-center space-y-6">
+        <div class="text-center space-y-6 max-w-sm w-full">
             <h1 class="text-4xl font-bold">🌿 綠意收藏家</h1>
-            <p class="text-emerald-300">雲端同步版：請先登入以開始管理您的私藏</p>
-            <button id="login-btn" class="bg-white text-gray-900 flex items-center gap-3 px-6 py-3 rounded-full font-bold text-lg shadow-lg hover:bg-gray-100 transition-all">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
-                使用 Google 帳號登入
-            </button>
+            <p class="text-emerald-300 text-sm">歡迎來到專屬您的珍藏管理空間</p>
+            
+            <div class="space-y-3 pt-4">
+                <button id="login-btn" class="w-full bg-white text-gray-900 flex items-center justify-center gap-3 px-6 py-3 rounded-full font-bold text-md shadow-lg hover:bg-gray-100 transition-all">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
+                    使用 Google 帳號登入
+                </button>
+                
+                <button id="guest-btn" class="w-full bg-emerald-800/50 hover:bg-emerald-800 text-emerald-200 border border-emerald-600/50 flex items-center justify-center gap-3 px-6 py-3 rounded-full font-bold text-md transition-all">
+                    🔑 以訪客身分繼續 (使用本地儲存)
+                </button>
+            </div>
+
             <div id="login-loading" class="hidden flex justify-center"><div class="loader"></div></div>
         </div>
     </div>
@@ -70,8 +78,11 @@
                 <button onclick="switchTab('dashboard')" class="hover:text-emerald-300 text-sm">儀表板</button>
                 <button onclick="switchTab('collection')" class="hover:text-emerald-300 text-sm">收藏</button>
                 <button onclick="switchTab('wishlist')" class="hover:text-emerald-300 text-sm">願望</button>
+                
+                <!-- 狀態與大頭貼 -->
                 <div id="user-profile" class="flex items-center gap-2 border-l border-white/20 pl-4">
-                    <img id="user-avatar" src="" class="w-8 h-8 rounded-full border border-emerald-400">
+                    <span id="storage-mode-badge" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full">雲端同步中</span>
+                    <img id="user-avatar" src="https://via.placeholder.com/150" class="w-8 h-8 rounded-full border border-emerald-400 object-cover">
                     <button onclick="handleLogout()" class="text-xs opacity-70 hover:opacity-100">登出</button>
                 </div>
             </div>
@@ -140,27 +151,27 @@
             <h3 class="text-xl font-bold mb-4">加入新收藏</h3>
             <div class="space-y-4">
                 <div>
-                    <label class="text-xs text-emerald-300">物品照片</label>
+                    <label class="text-xs text-emerald-300">物品照片 (建議小於 500KB)</label>
                     <input type="file" id="item-image" accept="image/*" class="mt-1 text-sm file:bg-emerald-700 file:text-white file:border-none file:rounded file:px-2 file:mr-4">
                     <div id="image-preview" class="mt-2 hidden"><img class="w-full h-32 object-cover rounded border border-white/20"></div>
                 </div>
-                <input type="text" id="item-name" placeholder="物品名稱">
+                <input type="text" id="item-name" class="p-2 bg-black/20 text-white w-full rounded border border-white/10" placeholder="物品名稱">
                 <div class="grid grid-cols-2 gap-2">
-                    <select id="item-category">
+                    <select id="item-category" class="p-2 bg-black/20 text-white rounded border border-white/10">
                         <option value="公仔模型">公仔模型</option>
                         <option value="電子產品">電子產品</option>
                         <option value="書籍/漫畫">書籍/漫畫</option>
                         <option value="其他">其他</option>
                     </select>
-                    <input type="number" id="item-price" placeholder="購入價值 ($)">
+                    <input type="number" id="item-price" class="p-2 bg-black/20 text-white rounded border border-white/10" placeholder="購入價值 ($)">
                 </div>
                 <div>
                     <label class="block text-sm mb-1 text-emerald-300 text-center">評分：<span id="rating-val">3.0</span></label>
-                    <input type="range" id="item-rating" min="1" max="5" step="0.5" value="3.0">
+                    <input type="range" id="item-rating" min="1" max="5" step="0.5" value="3.0" class="w-full">
                 </div>
                 <div class="flex gap-2 pt-2">
-                    <button onclick="saveItemToFirestore()" id="save-item-btn" class="btn-primary flex-1 py-2 rounded font-bold">確認儲存</button>
-                    <button onclick="toggleModal('modal-add-item')" class="bg-gray-600 flex-1 py-2 rounded">取消</button>
+                    <button onclick="saveItemToFirestore()" id="save-item-btn" class="btn-primary flex-1 py-2 rounded font-bold text-white">確認儲存</button>
+                    <button onclick="toggleModal('modal-add-item')" class="bg-gray-600 flex-1 py-2 rounded text-white hover:bg-gray-500">取消</button>
                 </div>
             </div>
         </div>
@@ -171,11 +182,11 @@
         <div class="glass-card bg-emerald-900 w-full max-w-md p-6">
             <h3 class="text-xl font-bold mb-4">許下新願望</h3>
             <div class="space-y-4">
-                <input type="text" id="wish-name" placeholder="想要什麼？">
-                <input type="number" id="wish-target" placeholder="目標價格 ($)">
+                <input type="text" id="wish-name" class="p-2 bg-black/20 text-white w-full rounded border border-white/10" placeholder="想要什麼？">
+                <input type="number" id="wish-target" class="p-2 bg-black/20 text-white w-full rounded border border-white/10" placeholder="目標價格 ($)">
                 <div class="flex gap-2">
-                    <button onclick="saveWishToFirestore()" class="btn-primary flex-1 py-2 rounded font-bold">加入清單</button>
-                    <button onclick="toggleModal('modal-add-wish')" class="bg-gray-600 flex-1 py-2 rounded">取消</button>
+                    <button onclick="saveWishToFirestore()" class="btn-primary flex-1 py-2 rounded font-bold text-white">加入清單</button>
+                    <button onclick="toggleModal('modal-add-wish')" class="bg-gray-600 flex-1 py-2 rounded text-white hover:bg-gray-500">取消</button>
                 </div>
             </div>
         </div>
@@ -208,28 +219,26 @@
         let base64Image = "";
         let unsubItems = null;
         let unsubWishes = null;
+        let isLocalStorageMode = false; // 是否因規則拒絕等原因自動切換為本地儲存
 
         const initAuth = async () => {
             const loginBtn = document.getElementById('login-btn');
+            const guestBtn = document.getElementById('guest-btn');
             const loading = document.getElementById('login-loading');
 
-            loginBtn.addEventListener('click', async () => {
-                loginBtn.classList.add('hidden');
-                loading.classList.remove('hidden');
-                try {
-                    await signInWithPopup(auth, new GoogleAuthProvider());
-                } catch (e) {
-                    console.error("Login Error", e);
-                    loginBtn.classList.remove('hidden');
-                    loading.classList.add('hidden');
-                }
-            });
-
+            // 1. 註冊登入狀態變化監聽器
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     currentUser = user;
                     document.getElementById('auth-overlay').classList.add('hidden');
                     document.getElementById('user-avatar').src = user.photoURL || 'https://via.placeholder.com/150';
+                    
+                    if (user.isAnonymous) {
+                        updateStorageModeBadge("本地離線模式", "bg-yellow-500/20", "text-yellow-300");
+                    } else {
+                        updateStorageModeBadge("雲端同步中", "bg-emerald-500/20", "text-emerald-300");
+                    }
+                    
                     setupListeners();
                 } else {
                     currentUser = null;
@@ -237,93 +246,213 @@
                     if (unsubWishes) unsubWishes();
                     document.getElementById('auth-overlay').classList.remove('hidden');
                     loginBtn.classList.remove('hidden');
+                    guestBtn.classList.remove('hidden');
                     loading.classList.add('hidden');
                 }
             });
 
+            // 2. Google 登入事件
+            loginBtn.addEventListener('click', async () => {
+                loginBtn.classList.add('hidden');
+                guestBtn.classList.add('hidden');
+                loading.classList.remove('hidden');
+                try {
+                    await signInWithPopup(auth, new GoogleAuthProvider());
+                } catch (e) {
+                    console.error("Login Error", e);
+                    loginBtn.classList.remove('hidden');
+                    guestBtn.classList.remove('hidden');
+                    loading.classList.add('hidden');
+                    alert("Google 登入失敗，請嘗試使用訪客登入！");
+                }
+            });
+
+            // 3. 訪客登入事件
+            guestBtn.addEventListener('click', async () => {
+                loginBtn.classList.add('hidden');
+                guestBtn.classList.add('hidden');
+                loading.classList.remove('hidden');
+                try {
+                    await signInAnonymously(auth);
+                } catch (e) {
+                    console.error("Anonymous Sign-In Error", e);
+                    // 萬一連匿名登入都連不上（例如完全沒網路），直接切換至本機模式
+                    activateLocalStorageMode();
+                }
+            });
+
+            // 4. 自定義 Token 初始化
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                try { await signInWithCustomToken(auth, __initial_auth_token); } 
-                catch (e) { await signInAnonymously(auth); }
+                try { 
+                    await signInWithCustomToken(auth, __initial_auth_token); 
+                } catch (e) { 
+                    try { await signInAnonymously(auth); } catch(err) { activateLocalStorageMode(); }
+                }
             }
         };
 
+        const updateStorageModeBadge = (text, bgColor, textColor) => {
+            const badge = document.getElementById('storage-mode-badge');
+            badge.textContent = text;
+            badge.className = `text-[10px] ${bgColor} ${textColor} px-2 py-0.5 rounded-full`;
+        };
+
+        // --- 啟用完全本地儲存模式（當 Firebase Rules 報錯時自動啟用） ---
+        const activateLocalStorageMode = () => {
+            isLocalStorageMode = true;
+            console.warn("⚠️ 已安全切換至本地快取儲存模式（LocalStorage）");
+            updateStorageModeBadge("本地儲存模式", "bg-orange-500/20", "text-orange-300");
+            document.getElementById('auth-overlay').classList.add('hidden');
+            
+            // 載入本地儲存資料
+            collectionData = JSON.parse(localStorage.getItem('emerald_local_items')) || [];
+            wishlistData = JSON.parse(localStorage.getItem('emerald_local_wishes')) || [];
+            renderAll();
+        };
+
         const setupListeners = () => {
-            if (!currentUser) return;
+            if (!currentUser || isLocalStorageMode) return;
             
             const collRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items');
             const wishRef = collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes');
 
-            const handleError = (err) => {
-                console.error("Firestore Permission Error:", err);
+            const handlePermissionDenied = (err) => {
+                console.error("Firestore Permission Error, fallback to LocalStorage:", err);
+                if (err.code === 'permission-denied') {
+                    // 自動無縫切換，提升使用者體驗，不彈出崩潰錯誤
+                    activateLocalStorageMode();
+                }
             };
 
             unsubItems = onSnapshot(collRef, (snap) => {
                 collectionData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAll();
-            }, handleError);
+            }, handlePermissionDenied);
 
             unsubWishes = onSnapshot(wishRef, (snap) => {
                 wishlistData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderAll();
-            }, handleError);
+            }, handlePermissionDenied);
         };
 
-        // --- Data Actions ---
+        // --- 資料儲存/更新與刪除操作 ---
         window.saveItemToFirestore = async () => {
-            if (!currentUser) return;
             const btn = document.getElementById('save-item-btn');
             const name = document.getElementById('item-name').value;
             const category = document.getElementById('item-category').value;
             const price = parseFloat(document.getElementById('item-price').value) || 0;
             const rating = parseFloat(document.getElementById('item-rating').value);
-            if (!name) return;
+            if (!name) return alert("請輸入物品名稱！");
 
             btn.disabled = true;
             btn.textContent = "儲存中...";
-            try {
-                await addDoc(collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items'), {
-                    name, category, price, rating, image: base64Image, createdAt: new Date().toISOString()
-                });
+
+            const payload = {
+                name, category, price, rating, image: base64Image, createdAt: new Date().toISOString()
+            };
+
+            if (isLocalStorageMode || !currentUser) {
+                // 本地儲存模式
+                payload.id = Date.now().toString();
+                collectionData.push(payload);
+                localStorage.setItem('emerald_local_items', JSON.stringify(collectionData));
                 toggleModal('modal-add-item');
                 resetItemForm();
-            } catch (e) { alert("儲存失敗：請檢查規則設定。"); }
-            finally { btn.disabled = false; btn.textContent = "確認儲存"; }
+                renderAll();
+                btn.disabled = false;
+                btn.textContent = "確認儲存";
+            } else {
+                // 雲端同步模式
+                try {
+                    await addDoc(collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'items'), payload);
+                    toggleModal('modal-add-item');
+                    resetItemForm();
+                } catch (e) { 
+                    console.error("Save Error", e);
+                    alert("儲存失敗，請檢查網路連線或稍後再試。"); 
+                } finally { 
+                    btn.disabled = false; 
+                    btn.textContent = "確認儲存"; 
+                }
+            }
         };
 
         window.saveWishToFirestore = async () => {
-            if (!currentUser) return;
             const name = document.getElementById('wish-name').value;
             const target = parseFloat(document.getElementById('wish-target').value) || 0;
-            if (!name || !target) return;
-            try {
-                await addDoc(collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes'), {
-                    name, target, saved: 0, createdAt: new Date().toISOString()
-                });
+            if (!name || !target) return alert("請輸入完整名稱與目標金額！");
+
+            const payload = {
+                name, target, saved: 0, createdAt: new Date().toISOString()
+            };
+
+            if (isLocalStorageMode || !currentUser) {
+                payload.id = Date.now().toString();
+                wishlistData.push(payload);
+                localStorage.setItem('emerald_local_wishes', JSON.stringify(wishlistData));
                 toggleModal('modal-add-wish');
                 document.getElementById('wish-name').value = '';
                 document.getElementById('wish-target').value = '';
-            } catch (e) { console.error(e); }
+                renderAll();
+            } else {
+                try {
+                    await addDoc(collection(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes'), payload);
+                    toggleModal('modal-add-wish');
+                    document.getElementById('wish-name').value = '';
+                    document.getElementById('wish-target').value = '';
+                } catch (e) { console.error(e); }
+            }
         };
 
         window.updateWishSaved = async (id, amount) => {
-            if (!currentUser) return;
-            const wish = wishlistData.find(w => w.id === id);
-            if (wish) {
-                await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes', id), {
-                    saved: Math.max(0, wish.saved + amount)
-                });
+            const wishIndex = wishlistData.findIndex(w => w.id === id);
+            if (wishIndex !== -1) {
+                const wish = wishlistData[wishIndex];
+                const newSaved = Math.max(0, wish.saved + amount);
+
+                if (isLocalStorageMode || !currentUser) {
+                    wishlistData[wishIndex].saved = newSaved;
+                    localStorage.setItem('emerald_local_wishes', JSON.stringify(wishlistData));
+                    renderAll();
+                } else {
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, 'wishes', id), {
+                        saved: newSaved
+                    });
+                }
             }
         };
 
         window.deleteFirestoreDoc = async (id, type) => {
-            if (!currentUser || !confirm("確定要刪除嗎？")) return;
+            if (!confirm("確定要刪除嗎？")) return;
             const coll = type === 'coll' ? 'items' : 'wishes';
-            await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, coll, id));
+
+            if (isLocalStorageMode || !currentUser) {
+                if (type === 'coll') {
+                    collectionData = collectionData.filter(i => i.id !== id);
+                    localStorage.setItem('emerald_local_items', JSON.stringify(collectionData));
+                } else {
+                    wishlistData = wishlistData.filter(w => w.id !== id);
+                    localStorage.setItem('emerald_local_wishes', JSON.stringify(wishlistData));
+                }
+                renderAll();
+            } else {
+                await deleteDoc(doc(db, 'artifacts', APP_ID, 'users', currentUser.uid, coll, id));
+            }
         };
 
-        window.handleLogout = () => signOut(auth);
+        window.handleLogout = async () => {
+            if (isLocalStorageMode) {
+                if(confirm("切換帳號將會清除目前的暫存資料，確定繼續？")) {
+                    localStorage.removeItem('emerald_local_items');
+                    localStorage.removeItem('emerald_local_wishes');
+                    location.reload();
+                }
+            } else {
+                await signOut(auth);
+            }
+        };
 
-        // --- Render UI ---
+        // --- 渲染 UI ---
         function renderAll() {
             renderDashboard();
             renderCollectionGrid();
@@ -426,21 +555,38 @@
 
         function updateChart(labels, values) {
             const ctx = document.getElementById('categoryChart').getContext('2d');
+            
+            // 防呆處理：若完全無資料，渲染預設灰色圓餅圖，避免 Chart.js 報錯或出現空白
+            let chartLabels = labels;
+            let chartValues = values;
+            let bgColors = ['#10b981', '#34d399', '#059669', '#047857', '#065f46'];
+            
+            if (labels.length === 0) {
+                chartLabels = ['無收藏類別'];
+                chartValues = [1];
+                bgColors = ['rgba(255,255,255,0.1)'];
+            }
+
             if (chartInstance) chartInstance.destroy();
             chartInstance = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels,
-                    datasets: [{ data: values, backgroundColor: ['#10b981', '#34d399', '#059669', '#047857', '#065f46'], borderWidth: 0 }]
+                    labels: chartLabels,
+                    datasets: [{ data: chartValues, backgroundColor: bgColors, borderWidth: 0 }]
                 },
                 options: { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#fff', boxWidth: 12, font: { size: 10 } } } } }
             });
         }
 
+        // --- 圖片壓縮並轉 base64 (防止文檔大小超載) ---
         document.getElementById('item-image').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                if (file.size > 500000) { alert("圖片需小於 500KB"); this.value = ""; return; }
+                if (file.size > 500000) { 
+                    alert("為了確保流暢的儲存速度，圖片大小需小於 500KB。請壓縮或更換圖片！"); 
+                    this.value = ""; 
+                    return; 
+                }
                 const reader = new FileReader();
                 reader.onload = (ev) => {
                     base64Image = ev.target.result;
@@ -455,6 +601,9 @@
         function resetItemForm() {
             document.getElementById('item-name').value = '';
             document.getElementById('item-price').value = '';
+            document.getElementById('item-rating').value = '3.0';
+            document.getElementById('rating-val').textContent = '3.0';
+            document.getElementById('item-category').selectedIndex = 0;
             base64Image = "";
             document.getElementById('image-preview').classList.add('hidden');
             document.getElementById('item-image').value = "";
